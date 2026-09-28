@@ -6,6 +6,7 @@ import {
   detectarDuplicidadeMesmoContacto,
 } from '@/lib/validacao-submissao'
 import { serverStore } from '@/lib/server-store'
+import { executarPipelineTriagem } from '@/lib/pipeline-triagem'
 import { Ocorrencia } from '@/types/ocorrencia'
 
 export async function POST(request: Request) {
@@ -150,17 +151,10 @@ export async function POST(request: Request) {
     novaOcorrenciaBase.id = ocorrenciaCriadaId
     serverStore.salvarOcorrencia(novaOcorrenciaBase)
 
-    // 6. Disparo da Triagem (Classificação)
-    try {
-      const origin = new URL(request.url).origin
-      fetch(`${origin}/api/classificar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ocorrencia_id: ocorrenciaCriadaId }),
-      }).catch((err) => console.error('Aviso: Erro assíncrono na triagem:', err))
-    } catch (e) {
-      console.error('Falha ao disparar triagem assíncrona:', e)
-    }
+    // 6. Disparo da Triagem em Background (In-Process, sem loopback HTTP/SSL)
+    executarPipelineTriagem(ocorrenciaCriadaId).catch((err) => {
+      console.error('Aviso: Erro assíncrono na triagem:', err)
+    })
 
     const protocolo = `PROT-${ocorrenciaCriadaId.substring(0, 8).toUpperCase()}`
 

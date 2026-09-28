@@ -40,7 +40,7 @@ describe('Motor de Integração Externa & Segurança Criptográfica (Mapa de Dis
     assert.strictEqual(validoSecretErrado, false, 'Segredo incorreto deve falhar na validação')
   })
 
-  it('deve autenticar requisições via X-API-Key e Authorization Bearer em tempo constante', () => {
+  it('deve autenticar requisições via X-API-Key, Authorization Bearer e Query Param em tempo constante', () => {
     // 1. Chave correta via X-API-Key
     assert.strictEqual(
       verificarApiKeyIntegracao(null, DEFAULT_INTEGRATION_API_KEY),
@@ -55,16 +55,30 @@ describe('Motor de Integração Externa & Segurança Criptográfica (Mapa de Dis
       'Deve autenticar chave válida via Bearer Token'
     )
 
-    // 3. Chave incorreta
+    // 3. Chave correta via Query Param (?api_key=...)
     assert.strictEqual(
-      verificarApiKeyIntegracao(null, 'chave_invalida_hack'),
-      false,
-      'Deve rejeitar chave inválida'
+      verificarApiKeyIntegracao(null, null, DEFAULT_INTEGRATION_API_KEY),
+      true,
+      'Deve autenticar chave válida via Query Param'
     )
 
-    // 4. Sem chave
+    // 4. Sessão de operador autenticado no dashboard
     assert.strictEqual(
-      verificarApiKeyIntegracao(null, null),
+      verificarApiKeyIntegracao(null, null, null, true),
+      true,
+      'Deve autenticar se o operador tiver sessão ativa no dashboard'
+    )
+
+    // 5. Chave incorreta via Query Param
+    assert.strictEqual(
+      verificarApiKeyIntegracao(null, null, 'chave_invalida_hack'),
+      false,
+      'Deve rejeitar chave inválida via query param'
+    )
+
+    // 6. Sem chave
+    assert.strictEqual(
+      verificarApiKeyIntegracao(null, null, null, false),
       false,
       'Deve rejeitar requisição sem credenciais'
     )

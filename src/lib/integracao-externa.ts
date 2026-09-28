@@ -67,12 +67,22 @@ export function getWebhookSecret(): string {
 
 /**
  * Validação de chave de API em tempo constante (timing-safe).
- * Aceita autenticação via cabeçalho 'X-API-Key' ou 'Authorization: Bearer <token>'.
+ * Aceita autenticação via:
+ * 1. Cabeçalho 'X-API-Key'
+ * 2. Cabeçalho 'Authorization: Bearer <token>'
+ * 3. Parâmetro de consulta URL '?api_key=<token>' ou '?token=<token>'
+ * 4. Sessão autenticada do operador no dashboard (isSessionAuth)
  */
 export function verificarApiKeyIntegracao(
   authHeader: string | null,
-  apiKeyHeader: string | null
+  apiKeyHeader: string | null,
+  queryApiKey?: string | null,
+  isSessionAuth?: boolean
 ): boolean {
+  if (isSessionAuth) {
+    return true
+  }
+
   const chaveConfigurada = getIntegrationApiKey()
 
   let chaveFornecida = ''
@@ -80,6 +90,8 @@ export function verificarApiKeyIntegracao(
     chaveFornecida = apiKeyHeader.trim()
   } else if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
     chaveFornecida = authHeader.substring(7).trim()
+  } else if (queryApiKey) {
+    chaveFornecida = queryApiKey.trim()
   }
 
   if (!chaveFornecida) {
@@ -299,6 +311,8 @@ export interface StatusConexaoExterna {
   verificadoEm: string
   urlDestino: string | null
   modo: 'webhook_ativo' | 'api_polling' | 'desconectado'
+  ultimoConsumoEm?: string | null
+  totalConsumos?: number
 }
 
 let ultimoStatusConexao: StatusConexaoExterna = {
@@ -308,9 +322,74 @@ let ultimoStatusConexao: StatusConexaoExterna = {
   verificadoEm: new Date().toISOString(),
   urlDestino: process.env.MAPA_WEBHOOK_URL || null,
   modo: process.env.MAPA_WEBHOOK_URL ? 'webhook_ativo' : 'api_polling',
+  ultimoConsumoEm: null,
+  totalConsumos: 0,
+}
+
+/**
+ * Regista evento de atividade ou consumo por parte do sistema externo (Pull ou Handshake Ping).
+ */
+export function registrarAtividadeIntegracao(
+  tipo: 'api_pull' | 'ping' | 'webhook',
+  detalhes?: string
+): void {
+  const agoraIso = new Date().toISOString()
+  ultimoStatusConexao = {
+    ...ultimoStatusConexao,
+    conectado: true,
+    latenciaMs: ultimoStatusConexao.latenciaMs || 1,
+    mensagem:
+      detalhes ||
+      (tipo === 'api_pull'
+        ? 'Dados GeoJSON consumidos com sucesso pelo sistema externo.'
+        : 'Handshake ativo confirmado com o sistema externo.'),
+    verificadoEm: agoraIso,
+    ultimoConsumoEm: agoraIso,
+    totalConsumos: (ultimoStatusConexao.totalConsumos || 0) + 1,
+    modo: process.env.MAPA_WEBHOOK_URL ? 'webhook_ativo' : 'api_polling',
+  }
 }
 
 export function obterStatusConexao(): StatusConexaoExterna {
+  const webhookUrl = process.env.MAPA_WEBHOOK_URL
+  const isLocalhostWebhook =
+    webhookUrl && (webhookUrl.includes('localhost') || webhookUrl.includes('127.0.0.1'))
+
+  // Alerta arquitetural: Webhook para localhost configurado no Render cloud
+  if (isLocalhostWebhook && process.env.NODE_ENV === 'production') {
+    return {
+      ...ultimoStatusConexao,
+      conectado: false,
+      mensagem:
+        'AVISO: MAPA_WEBHOOK_URL aponta para localhost. O Render na nuvem não consegue contactar a máquina do seu colega em localhost. Use a integração via API Pull (?api_key=...) ou crie um túnel via ngrok.',
+      urlDestino: webhookUrl,
+      modo: 'desconectado',
+    }
+  }
+
+  // No modo Pull (sem webhook URL), valida se houve consumo recente
+  if (!webhookUrl && ultimoStatusConexao.ultimoConsumoEm) {
+    const diffSegundos = Math.round(
+      (Date.now() - new Date(ultimoStatusConexao.ultimoConsumoEm).getTime()) / 1000
+    )
+    if (diffSegundos <= 180) {
+      return {
+        ...ultimoStatusConexao,
+        conectado: true,
+        mensagem: `Comunicação PULL ativa. Última consulta pelo Mapa há ${diffSegundos}s (${ultimoStatusConexao.totalConsumos || 1} requisições atendidas).`,
+        verificadoEm: new Date().toISOString(),
+      }
+    } else {
+      const min = Math.round(diffSegundos / 60)
+      return {
+        ...ultimoStatusConexao,
+        conectado: false,
+        mensagem: `Sem consulta recente do Mapa (último consumo há ${min} min). Verifique se o sistema do colega está a rodar e a requisitar a API.`,
+        verificadoEm: new Date().toISOString(),
+      }
+    }
+  }
+
   return { ...ultimoStatusConexao }
 }
 
@@ -335,9 +414,13 @@ export async function testarConexaoSistemaExterno(): Promise<StatusConexaoExtern
   // Se não houver webhook configurado, a comunicação funciona via API Pull (/api/v1/integracao/mapa)
   if (!webhookUrl) {
     ultimoStatusConexao = {
+      ...ultimoStatusConexao,
       conectado: true,
       latenciaMs: 1,
-      mensagem: 'Modo API Ativo: O sistema externo consome diretamente o endpoint GeoJSON autenticado.',
+      mensagem:
+        ultimoStatusConexao.ultimoConsumoEm
+          ? `Modo API Ativo: Última consulta pelo Mapa há ${Math.round((Date.now() - new Date(ultimoStatusConexao.ultimoConsumoEm).getTime()) / 1000)}s.`
+          : 'Modo API Ativo: O canal está pronto e à escuta. O sistema externo pode consumir via GET /api/v1/integracao/mapa.',
       verificadoEm: new Date().toISOString(),
       urlDestino: null,
       modo: 'api_polling',
@@ -378,6 +461,7 @@ export async function testarConexaoSistemaExterno(): Promise<StatusConexaoExtern
 
     if (response.ok) {
       ultimoStatusConexao = {
+        ...ultimoStatusConexao,
         conectado: true,
         latenciaMs: latencia,
         mensagem: `Comunicação bidirecional ativa com o Mapa de Distribuição (${latencia}ms).`,
@@ -387,6 +471,7 @@ export async function testarConexaoSistemaExterno(): Promise<StatusConexaoExtern
       }
     } else {
       ultimoStatusConexao = {
+        ...ultimoStatusConexao,
         conectado: false,
         latenciaMs: latencia,
         mensagem: `Sistema externo respondeu com status HTTP ${response.status}.`,
@@ -398,6 +483,7 @@ export async function testarConexaoSistemaExterno(): Promise<StatusConexaoExtern
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error)
     ultimoStatusConexao = {
+      ...ultimoStatusConexao,
       conectado: false,
       latenciaMs: Date.now() - inicio,
       mensagem: `Falha de conexão com o sistema externo: ${msg}`,

@@ -467,12 +467,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     {commStatus.latenciaMs} ms
                   </span>
                 </div>
-                {commStatus.urlDestino && (
+                {commStatus.urlDestino ? (
                   <div className="flex justify-between">
                     <span className="text-zinc-500">Endpoint Destino:</span>
                     <span className="font-bold text-zinc-800 dark:text-zinc-200 truncate max-w-[200px]">
                       {commStatus.urlDestino}
                     </span>
+                  </div>
+                ) : (
+                  <div className="space-y-1 pt-1 border-t border-zinc-200 dark:border-zinc-800">
+                    <span className="text-zinc-500 block">URL de Consumo (Sistema do Mapa):</span>
+                    <div className="flex items-center gap-1.5 bg-zinc-200 dark:bg-zinc-900 p-1 corporate-card text-[10px] break-all">
+                      <code className="text-blue-700 dark:text-blue-300 select-all flex-1">
+                        /api/v1/integracao/mapa?api_key=saas_sec_mapa_dev_key_2026
+                      </code>
+                      <a
+                        href="/api/v1/integracao/mapa?api_key=saas_sec_mapa_dev_key_2026"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-zinc-600 dark:text-zinc-400 hover:text-blue-600 p-1 shrink-0"
+                        title="Abrir GeoJSON no navegador"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
                   </div>
                 )}
                 <div className="flex justify-between">
