@@ -1,26 +1,121 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg-primary: #09090b;
+    --bg-surface: #18181b;
+    --bg-surface-hover: #27272a;
+    --text-main: #f4f4f5;
+    --text-muted: #a1a1aa;
+    --border-color: #27272a;
+    --border-strong: #3f3f46;
+    --accent: #1d4ed8;
+    --accent-hover: #1e40af;
+  }
+
+  .dark {
+    --bg-primary: #09090b;
+    --bg-surface: #18181b;
+    --bg-surface-hover: #27272a;
+    --text-main: #f4f4f5;
+    --text-muted: #a1a1aa;
+    --border-color: #27272a;
+    --border-strong: #3f3f46;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Regra rígida de estética Windows Forms / C# Desktop: cantos de 2px, sem gradientes */
+.corporate-card,
+.corporate-btn,
+.corporate-input,
+.corporate-badge,
+.corporate-dialog {
+  border-radius: 2px !important;
+}
+
+/* Estilização de GroupBox clássico do Windows Forms */
+.win-groupbox {
+  position: relative;
+  border: 1px solid var(--border-color);
+  padding: 0.75rem 1rem 1rem 1rem;
+  border-radius: 2px;
+  background-color: var(--bg-surface);
+}
+
+.win-groupbox > legend {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0 0.4rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Tabela estilo DataGridView */
+.win-datagrid th {
+  background-color: #f1f5f9;
+  border-bottom: 2px solid var(--border-color);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.dark .win-datagrid th {
+  background-color: #27272a;
+  border-bottom: 2px solid var(--border-color);
+}
+
+/* Barra de rolagem corporativa estilo Windows Forms / Desktop */
+.corporate-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #f1f5f9;
+}
+
+.dark .corporate-scrollbar {
+  scrollbar-color: #3f3f46 #18181b;
+}
+
+.corporate-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.corporate-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.corporate-scrollbar::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 2px;
+}
+
+.corporate-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+.dark .corporate-scrollbar::-webkit-scrollbar-track {
+  background: #18181b;
+}
+
+.dark .corporate-scrollbar::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+}
+
+.dark .corporate-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
 }
